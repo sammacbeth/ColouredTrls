@@ -1,0 +1,85 @@
+#created on: 23-Apr-2012
+package uk.ac.imperial.colrdtrls.facts
+
+#list any import classes here.
+import uk.ac.imperial.presage2.rules.facts.Agent
+import uk.ac.imperial.colrdtrls.facts.Tile
+import uk.ac.imperial.colrdtrls.facts.Player
+import uk.ac.imperial.colrdtrls.facts.Colour
+import uk.ac.imperial.colrdtrls.facts.Owns
+import uk.ac.imperial.colrdtrls.facts.Surrender
+import uk.ac.imperial.colrdtrls.facts.Surrendered
+import uk.ac.imperial.presage2.util.location.Cell
+import java.lang.Integer
+
+
+#declare any global variables here
+global org.apache.log4j.Logger colrdtrlsLogger
+dialect "java" 
+
+declare Surrender
+	@role( event )
+end
+
+query owns (Player p, Colour c, Integer i)
+	Owns ( p := player, c := colour, i := count )
+end
+
+query tile (Cell c)
+	tile : Tile( location == c )
+end
+
+query colour ( Cell l, Colour c )
+	Tile ( l := location, c := col )
+end
+
+rule "Agent creation"
+	when
+		$a : Agent( )
+	then
+		colrdtrlsLogger.info( $a );
+end
+
+rule "Tile creation"
+
+    when
+        $t : Tile( )
+    then
+    	colrdtrlsLogger.info( $t );
+
+end
+
+rule "Create players"
+	when
+		$p : Player( )
+	then
+		colrdtrlsLogger.info( $p );
+end
+
+rule "Number of tokens owned"
+	when
+		owns( $p, $c, $i ;)
+	then
+		colrdtrlsLogger.info( $p +" owns "+ $i +" "+ $c +" tokens" );
+end
+
+declare ProcessedSurrender
+	surrender : Surrender @key
+end
+
+rule "Process Surrender"
+	when
+		$s : Surrender( $p : actor, $c : colour )
+		$o : Owns( $p := player, $c := colour, count > 0 )
+		$d : Surrendered( $p := player, $c := colour )
+		not ProcessedSurrender( $s ;)
+	then
+		modify($o) {
+			decrement();
+		};
+		modify($d) {
+			increment();
+		};
+		insert(new ProcessedSurrender( $s ));
+		colrdtrlsLogger.info("Process surrender: "+ $s +", now surrendered: "+ $d);
+end
