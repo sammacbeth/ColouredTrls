@@ -7,6 +7,7 @@ import org.apache.log4j.Logger;
 import org.drools.runtime.StatefulKnowledgeSession;
 
 import uk.ac.imperial.colrdtrls.facts.CellTranslator;
+import uk.ac.imperial.presage2.core.plugin.PluginModule;
 import uk.ac.imperial.presage2.core.simulator.InjectedSimulation;
 import uk.ac.imperial.presage2.core.simulator.Parameter;
 import uk.ac.imperial.presage2.core.simulator.Scenario;
@@ -34,6 +35,10 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 	public int y;
 	@Parameter(name = "turnlength")
 	public int turnLength;
+	@Parameter(name = "seed")
+	public int randomSeed;
+	@Parameter(name = "agents")
+	public int agents;
 
 	private StatefulKnowledgeSession session;
 
@@ -59,6 +64,16 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 				.addStateTranslator(SimParticipantsTranslator.class)
 				.addAgentStateTranslator(CellTranslator.class));
 		modules.add(NetworkModule.fullyConnectedNetworkModule());
+		modules.add(new PluginModule().addPlugin(TokenStoragePlugin.class));
+		modules.add(new AbstractModule() {
+			@Override
+			protected void configure() {
+				RandomTokenDistribution tokenDist = new RandomTokenDistribution(
+						randomSeed);
+				bind(TileColourGenerator.class).toInstance(tokenDist);
+				bind(TokenAllocator.class).toInstance(tokenDist);
+			}
+		});
 		return modules;
 	}
 
@@ -66,7 +81,7 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 	protected void addToScenario(Scenario s) {
 		session.setGlobal("colrdtrlsLogger", logger);
 
-		for (int i = 0; i < 2; i++) {
+		for (int i = 0; i < agents; i++) {
 			int initialX = Random.randomInt(x);
 			int initialY = Random.randomInt(y);
 			Cell startLoc = new Cell(initialX, initialY);

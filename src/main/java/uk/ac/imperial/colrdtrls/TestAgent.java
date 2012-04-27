@@ -3,8 +3,6 @@ package uk.ac.imperial.colrdtrls;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
-
 import uk.ac.imperial.colrdtrls.facts.Colour;
 import uk.ac.imperial.colrdtrls.facts.Move;
 import uk.ac.imperial.colrdtrls.facts.Surrender;
@@ -20,7 +18,6 @@ import uk.ac.imperial.presage2.util.participant.AbstractParticipant;
 
 public class TestAgent extends AbstractParticipant {
 
-	private final Logger logger = Logger.getLogger(TestAgent.class);
 	Cell loc;
 	TileColourService tileService;
 	KnowledgeBaseService knowledge;
@@ -64,17 +61,20 @@ public class TestAgent extends AbstractParticipant {
 		logger.info("My Location is: " + this.loc);
 
 		if (nextTurn == time) {
-			int x = (int) (Random.randomInt(2) - 1 + loc.getX());
-			int y = (int) (Random.randomInt(2) - 1 + loc.getY());
-			Cell target = new Cell(x, y);
-			Colour c = this.tileService.getTileColour(x, y);
-			logger.info("Move: " + target);
 			try {
+				int x = (int) (Random.randomInt(3) - 1 + loc.getX());
+				int y = (int) (Random.randomInt(3) - 1 + loc.getY());
+				Cell target = new Cell(x, y);
+				Colour c = this.tileService.getTileColour(x, y);
+				logger.info("Move: " + target);
 				this.environment.act(new Move(target), getID(), authkey);
 				this.environment.act(new Surrender(c), getID(), authkey);
+			} catch (IndexOutOfBoundsException e) {
+				logger.warn("", e);
 			} catch (ActionHandlingException e) {
 				logger.warn("", e);
 			}
+
 			nextTurn = this.knowledge.nextTurn();
 		}
 	}
