@@ -65,7 +65,8 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 				.addStateTranslator(SimParticipantsTranslator.class)
 				.addAgentStateTranslator(CellTranslator.class));
 		modules.add(NetworkModule.fullyConnectedNetworkModule());
-		modules.add(new PluginModule().addPlugin(TokenStoragePlugin.class)
+		modules.add(new PluginModule()
+				.addPlugin(TokenStoragePlugin.class)
 				.addPlugin(GameDisplayPlugin.class));
 		modules.add(new AbstractModule() {
 			@Override

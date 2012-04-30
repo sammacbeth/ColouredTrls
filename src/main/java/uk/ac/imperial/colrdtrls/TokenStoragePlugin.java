@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import uk.ac.imperial.colrdtrls.facts.Colour;
+import uk.ac.imperial.colrdtrls.facts.Player;
 import uk.ac.imperial.presage2.core.db.StorageService;
 import uk.ac.imperial.presage2.core.db.persistent.TransientAgentState;
 import uk.ac.imperial.presage2.core.environment.EnvironmentServiceProvider;
@@ -19,6 +20,7 @@ public class TokenStoragePlugin implements Plugin {
 	StorageService storage;
 	private final EnvironmentMembersService membersService;
 	final TileColourService tileService;
+	final KnowledgeBaseService knowledge;
 
 	@Inject
 	public TokenStoragePlugin(EnvironmentServiceProvider serviceProvider)
@@ -28,6 +30,8 @@ public class TokenStoragePlugin implements Plugin {
 				.getEnvironmentService(EnvironmentMembersService.class);
 		this.tileService = serviceProvider
 				.getEnvironmentService(TileColourService.class);
+		this.knowledge = serviceProvider
+				.getEnvironmentService(KnowledgeBaseService.class);
 	}
 
 	@Inject(optional = true)
@@ -41,14 +45,19 @@ public class TokenStoragePlugin implements Plugin {
 			for (UUID pid : this.membersService.getParticipants()) {
 				Map<Colour, Integer> tokens = this.tileService
 						.getPlayerTokens(pid);
+				TransientAgentState s = this.storage.getAgentState(pid, SimTime
+						.get().intValue());
 				if (tokens != null) {
-					TransientAgentState s = this.storage.getAgentState(pid,
-							SimTime.get().intValue());
 					for (Map.Entry<Colour, Integer> entry : tokens.entrySet()) {
 						s.setProperty(entry.getKey().toString(), entry
 								.getValue().toString());
 					}
 				}
+				Player p = this.knowledge.getPlayer(pid);
+				s.setProperty("payoff", Integer.toString(p.getUtilityEarnt()));
+				s.setProperty("x", Double.toString(p.getLocation().getX()));
+				s.setProperty("y", Double.toString(p.getLocation().getY()));
+				s.setProperty("z", Double.toString(p.getLocation().getZ()));
 			}
 		}
 	}
