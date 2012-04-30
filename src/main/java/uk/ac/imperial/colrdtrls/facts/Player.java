@@ -10,8 +10,9 @@ public class Player {
 
 	Agent agent;
 	Cell location;
-	public Map<Colour, Owns> owns = new HashMap<Colour, Owns>();
-	public Map<Colour, Surrendered> surrendered = new HashMap<Colour, Surrendered>();
+	public int utilityEarnt = 0;
+	Map<Colour, Owns> owns = new HashMap<Colour, Owns>();
+	Map<Colour, Surrendered> surrendered = new HashMap<Colour, Surrendered>();
 
 	public Player(Agent agent, Cell location) {
 		super();
@@ -42,6 +43,10 @@ public class Player {
 	public void surrenderToken(Colour c) {
 		owns.get(c).count--;
 		surrendered.get(c).count++;
+	}
+
+	public int getUtilityEarnt() {
+		return utilityEarnt;
 	}
 
 	@Override
@@ -76,7 +81,8 @@ public class Player {
 
 	@Override
 	public String toString() {
-		return "Player [agent=" + agent + ", location=" + location + "]";
+		return "Player [agent=" + agent + ", location=" + location
+				+ ", utilityEarnt=" + utilityEarnt + "]";
 	}
 
 }

@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import uk.ac.imperial.colrdtrls.facts.Colour;
+import uk.ac.imperial.colrdtrls.facts.Goal;
 import uk.ac.imperial.colrdtrls.facts.Move;
 import uk.ac.imperial.colrdtrls.facts.Surrender;
 import uk.ac.imperial.presage2.core.environment.ActionHandlingException;
@@ -62,13 +63,21 @@ public class TestAgent extends AbstractParticipant {
 
 		if (nextTurn == time) {
 			try {
-				int x = (int) (Random.randomInt(3) - 1 + loc.getX());
-				int y = (int) (Random.randomInt(3) - 1 + loc.getY());
-				Cell target = new Cell(x, y);
-				Colour c = this.tileService.getTileColour(x, y);
-				logger.info("Move: " + target);
-				this.environment.act(new Move(target), getID(), authkey);
-				this.environment.act(new Surrender(c), getID(), authkey);
+				Goal g = this.knowledge.getGoal(getID());
+				if (g != null && !this.loc.equals(g.getGoal())) {
+					int dx = (int) Math.round(g.getGoal().getX() - this.loc.getX());
+					int dy = (int) Math.round(g.getGoal().getY() - this.loc.getY());
+					// normalise
+					dx = dx != 0 ? dx / Math.abs(dx) : 0;
+					dy = dy != 0 ? dy / Math.abs(dy) : 0;
+					int x = (int) this.loc.getX() + dx;
+					int y = (int) (this.loc.getY() + dy);
+					Cell target = new Cell(x, y);
+					Colour c = this.tileService.getTileColour(x, y);
+					logger.info("Move: " + target);
+					this.environment.act(new Move(target), getID(), authkey);
+					this.environment.act(new Surrender(c), getID(), authkey);
+				}
 			} catch (IndexOutOfBoundsException e) {
 				logger.warn("", e);
 			} catch (ActionHandlingException e) {

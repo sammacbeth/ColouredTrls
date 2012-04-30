@@ -115,7 +115,7 @@ public class TileColourService extends EnvironmentService {
 			surrenderedTokenMap.put(c, session.insert(s));
 		}
 		logger.info("Player: " + p.getAgent().getAid()
-				+ " got token allocation: " + p.owns);
+				+ " got token allocation: ");
 	}
 
 	@EventListener

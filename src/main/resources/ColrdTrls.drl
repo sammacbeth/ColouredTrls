@@ -29,10 +29,6 @@ query tile (Cell c)
 	tile : Tile( location == c )
 end
 
-query colour ( Cell l, Colour c )
-	Tile ( l := location, c := col )
-end
-
 rule "Agent creation"
 	when
 		$a : Agent( )

@@ -1,0 +1,33 @@
+#created on: 27-Apr-2012
+package uk.ac.imperial.colrdtrls.facts
+
+#list any import classes here.#
+import uk.ac.imperial.colrdtrls.facts.Goal;
+import uk.ac.imperial.presage2.core.util.random.Random;
+import java.util.List
+
+#declare any global variables here
+global org.apache.log4j.Logger colrdtrlsLogger
+
+rule "Create goal for agents when none exist"
+    when
+        $p : Player( )
+        not Goal( player == $p )
+        $tiles : List( size > 0 ) from collect( Tile( location != $p.getLocation() ) )
+    then
+    	Goal g = Goal.randomGoal( $p, Random.randomInt(10), $tiles);
+    	colrdtrlsLogger.info("Creating goal "+ g);
+        insert( g );
+end
+
+rule "Reward agent when goal is achieved"
+	when
+		$p : Player( $l : location )
+		$g : Goal( player == $p, goal == $l, $pay : payoff )
+	then
+		colrdtrlsLogger.info("Paying off for goal: "+ $g);
+		modify($p) {
+			utilityEarnt += $pay;
+		};
+		retract($g);
+end

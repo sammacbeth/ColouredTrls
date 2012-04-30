@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.drools.runtime.ObjectFilter;
 import org.drools.runtime.StatefulKnowledgeSession;
 
+import uk.ac.imperial.colrdtrls.facts.Goal;
 import uk.ac.imperial.colrdtrls.facts.Player;
 import uk.ac.imperial.presage2.core.environment.EnvironmentService;
 import uk.ac.imperial.presage2.core.environment.EnvironmentSharedStateAccess;
@@ -44,6 +45,23 @@ public class KnowledgeBaseService extends EnvironmentService {
 		});
 		for (Object player : matches) {
 			return (Player) player;
+		}
+		return null;
+	}
+
+	public Goal getGoal(final UUID aid) {
+		Collection<Object> matches = session.getObjects(new ObjectFilter() {
+			@Override
+			public boolean accept(Object object) {
+				if (object instanceof Goal) {
+					Goal g = (Goal) object;
+					return g.getPlayer().getAgent().getAid().equals(aid);
+				}
+				return false;
+			}
+		});
+		for (Object player : matches) {
+			return (Goal) player;
 		}
 		return null;
 	}

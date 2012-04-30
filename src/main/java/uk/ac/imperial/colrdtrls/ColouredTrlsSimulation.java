@@ -61,10 +61,12 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 				.setStorage(RuleStorage.class));
 		modules.add(new RuleModule().addClasspathDrlFile("ColrdTrls.drl")
 				.addClasspathDrlFile("MoveHandler.drl")
+				.addClasspathDrlFile("Goals.drl")
 				.addStateTranslator(SimParticipantsTranslator.class)
 				.addAgentStateTranslator(CellTranslator.class));
 		modules.add(NetworkModule.fullyConnectedNetworkModule());
-		modules.add(new PluginModule().addPlugin(TokenStoragePlugin.class));
+		modules.add(new PluginModule().addPlugin(TokenStoragePlugin.class)
+				.addPlugin(GameDisplayPlugin.class));
 		modules.add(new AbstractModule() {
 			@Override
 			protected void configure() {

@@ -27,6 +27,10 @@ declare Processed
 	move : Move @key
 end
 
+query colour ( Cell l, Colour c )
+	Tile ( l := location, c := col )
+end
+
 rule "Validate Move"
 	salience 10
 	when
