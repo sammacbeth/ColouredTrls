@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import uk.ac.imperial.colrdtrls.facts.Colour;
+import uk.ac.imperial.colrdtrls.facts.Goal;
 import uk.ac.imperial.colrdtrls.facts.Player;
 import uk.ac.imperial.presage2.core.db.StorageService;
 import uk.ac.imperial.presage2.core.db.persistent.TransientAgentState;
@@ -55,9 +56,18 @@ public class TokenStoragePlugin implements Plugin {
 				}
 				Player p = this.knowledge.getPlayer(pid);
 				s.setProperty("payoff", Integer.toString(p.getUtilityEarnt()));
-				s.setProperty("x", Double.toString(p.getLocation().getX()));
-				s.setProperty("y", Double.toString(p.getLocation().getY()));
-				s.setProperty("z", Double.toString(p.getLocation().getZ()));
+				s.setProperty("x",
+						Integer.toString((int) p.getLocation().getX()));
+				s.setProperty("y",
+						Integer.toString((int) p.getLocation().getY()));
+
+				Goal g = this.knowledge.getGoal(pid);
+				if (g != null) {
+					s.setProperty("goal-x",
+							Integer.toString((int) g.getGoal().getX()));
+					s.setProperty("goal-y",
+							Integer.toString((int) g.getGoal().getY()));
+				}
 			}
 		}
 	}
