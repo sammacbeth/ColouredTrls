@@ -13,7 +13,11 @@ public class Infringement {
 		super();
 		this.p = p;
 		this.action = action;
-		this.time = SimTime.get().intValue();
+		try {
+			this.time = SimTime.get().intValue();
+		} catch (NullPointerException e) {
+			this.time = 0;
+		}
 	}
 
 	public Action getAction() {
