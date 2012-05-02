@@ -10,7 +10,10 @@ import uk.ac.imperial.presage2.core.db.StorageService;
 import uk.ac.imperial.presage2.core.db.persistent.TransientAgentState;
 import uk.ac.imperial.presage2.core.environment.EnvironmentServiceProvider;
 import uk.ac.imperial.presage2.core.environment.UnavailableServiceException;
+import uk.ac.imperial.presage2.core.event.EventBus;
+import uk.ac.imperial.presage2.core.event.EventListener;
 import uk.ac.imperial.presage2.core.plugin.Plugin;
+import uk.ac.imperial.presage2.core.simulator.EndOfTimeCycle;
 import uk.ac.imperial.presage2.core.simulator.SimTime;
 import uk.ac.imperial.presage2.util.environment.EnvironmentMembersService;
 
@@ -24,8 +27,8 @@ public class TokenStoragePlugin implements Plugin {
 	final KnowledgeBaseService knowledge;
 
 	@Inject
-	public TokenStoragePlugin(EnvironmentServiceProvider serviceProvider)
-			throws UnavailableServiceException {
+	public TokenStoragePlugin(EnvironmentServiceProvider serviceProvider,
+			EventBus eb) throws UnavailableServiceException {
 		this.storage = null;
 		this.membersService = serviceProvider
 				.getEnvironmentService(EnvironmentMembersService.class);
@@ -33,6 +36,7 @@ public class TokenStoragePlugin implements Plugin {
 				.getEnvironmentService(TileColourService.class);
 		this.knowledge = serviceProvider
 				.getEnvironmentService(KnowledgeBaseService.class);
+		eb.subscribe(this);
 	}
 
 	@Inject(optional = true)
@@ -42,6 +46,11 @@ public class TokenStoragePlugin implements Plugin {
 
 	@Override
 	public void incrementTime() {
+
+	}
+
+	@EventListener
+	public void onEndOfTimeStep(EndOfTimeCycle e) {
 		if (this.storage != null) {
 			for (UUID pid : this.membersService.getParticipants()) {
 				Map<Colour, Integer> tokens = this.tileService
