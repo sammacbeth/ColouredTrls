@@ -19,6 +19,7 @@ import uk.ac.imperial.presage2.util.environment.AbstractEnvironmentModule;
 import uk.ac.imperial.presage2.util.location.Cell;
 import uk.ac.imperial.presage2.util.location.ParticipantLocationService;
 import uk.ac.imperial.presage2.util.location.area.Area;
+import uk.ac.imperial.presage2.util.location.area.AreaService;
 import uk.ac.imperial.presage2.util.network.NetworkModule;
 
 import com.google.inject.AbstractModule;
@@ -39,6 +40,8 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 	public int randomSeed;
 	@Parameter(name = "agents")
 	public int agents;
+	@Parameter(name = "tokens")
+	public int tokens;
 
 	private StatefulKnowledgeSession session;
 
@@ -58,6 +61,7 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 				.addParticipantGlobalEnvironmentService(
 						KnowledgeBaseService.class)
 				.addParticipantGlobalEnvironmentService(TileColourService.class)
+				.addParticipantGlobalEnvironmentService(AreaService.class)
 				.setStorage(RuleStorage.class));
 		modules.add(new RuleModule().addClasspathDrlFile("ColrdTrls.drl")
 				.addClasspathDrlFile("MoveHandler.drl")
@@ -72,7 +76,7 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 			@Override
 			protected void configure() {
 				RandomTokenDistribution tokenDist = new RandomTokenDistribution(
-						randomSeed);
+						randomSeed, tokens);
 				bind(TileColourGenerator.class).toInstance(tokenDist);
 				bind(TokenAllocator.class).toInstance(tokenDist);
 			}
@@ -88,8 +92,8 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 			int initialX = Random.randomInt(x);
 			int initialY = Random.randomInt(y);
 			Cell startLoc = new Cell(initialX, initialY);
-			s.addParticipant(new TestAgent(Random.randomUUID(), "agent" + i,
-					startLoc));
+			s.addParticipant(new TestAgent(Random.randomUUID(), "agent" + i, startLoc));
+			//s.addParticipant(new RuleAgent(Random.randomUUID(), "agent" + i, startLoc, "BasicAgent.drl"));
 		}
 	}
 

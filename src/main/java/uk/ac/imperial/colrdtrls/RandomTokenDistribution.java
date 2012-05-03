@@ -13,22 +13,24 @@ public class RandomTokenDistribution implements TileColourGenerator,
 		TokenAllocator {
 
 	final Random rand;
+	final int maxTokens;
 
-	public RandomTokenDistribution(int randSeed) {
+	public RandomTokenDistribution(int randSeed, int maxTokens) {
 		super();
 		this.rand = new Random(randSeed);
+		this.maxTokens = maxTokens;
 	}
 
 	@Override
 	public int allocateTokens(UUID agentId, Colour c) {
-		return rand.nextInt(10);
+		return rand.nextInt(maxTokens);
 	}
 
 	@Override
 	public Colour getTileColour(Cell c) {
 		Colour col;
 		switch (rand.nextInt(Colour.values().length)) {
-		case 0:
+		case 4:
 			col = Colour.BLUE;
 			break;
 		case 1:
