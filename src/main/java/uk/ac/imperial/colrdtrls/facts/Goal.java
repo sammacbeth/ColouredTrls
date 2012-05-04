@@ -19,8 +19,9 @@ public class Goal {
 	}
 
 	public static Goal randomGoal(Player p, int payoff, List<Tile> candidates) {
-		return new Goal(p, candidates.get(Random.randomInt(candidates.size()))
-				.getLocation(), payoff);
+		Cell randomCell = candidates.get(Random.randomInt(candidates.size())).getLocation();
+		payoff *= randomCell.distanceTo(p.getLocation());
+		return new Goal(p, randomCell, payoff);
 	}
 
 	public Player getPlayer() {

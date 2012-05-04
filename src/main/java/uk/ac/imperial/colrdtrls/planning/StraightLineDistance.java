@@ -8,7 +8,7 @@ public class StraightLineDistance implements SoftConstraint {
 
 	@Override
 	public double pathCost(LinkedList<Cell> path) {
-		return path.size() -1;
+		return path.size() - 1;
 	}
 
 	@Override

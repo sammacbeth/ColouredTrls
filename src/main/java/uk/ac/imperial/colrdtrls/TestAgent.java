@@ -63,18 +63,20 @@ public class TestAgent extends AbstractParticipant {
 			logger.warn(e);
 		}
 		nextTurn = this.knowledge.nextTurn();
+		NoInfringmentConstraint infcon = new NoInfringmentConstraint(getID(),
+				tileService, eb);
 		Set<HardConstraint> hardConstraints = new HashSet<HardConstraint>();
 		hardConstraints.add(new LoopConstraint());
 		try {
 			hardConstraints.add(new AreaConstraint(
 					getEnvironmentService(AreaService.class)));
-			hardConstraints.add(new NoInfringmentConstraint(getID(),
-					tileService, eb));
+			hardConstraints.add(infcon);
 		} catch (UnavailableServiceException e) {
 			logger.warn(e);
 		}
 		Set<SoftConstraint> softConstraints = new HashSet<SoftConstraint>();
 		softConstraints.add(new StraightLineDistance());
+		softConstraints.add(infcon);
 
 		planner = new PathPlanner(getID(), knowledge, hardConstraints,
 				softConstraints);

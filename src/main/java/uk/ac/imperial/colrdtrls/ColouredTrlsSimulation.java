@@ -70,12 +70,11 @@ public class ColouredTrlsSimulation extends InjectedSimulation {
 				.addAgentStateTranslator(CellTranslator.class));
 		modules.add(NetworkModule.fullyConnectedNetworkModule());
 		modules.add(new PluginModule()
-				.addPlugin(TokenStoragePlugin.class)
-				.addPlugin(GameDisplayPlugin.class));
+				.addPlugin(TokenStoragePlugin.class));
 		modules.add(new AbstractModule() {
 			@Override
 			protected void configure() {
-				RandomTokenDistribution tokenDist = new RandomTokenDistribution(
+				UniformTokenDistribution tokenDist = new UniformTokenDistribution(
 						randomSeed, tokens);
 				bind(TileColourGenerator.class).toInstance(tokenDist);
 				bind(TokenAllocator.class).toInstance(tokenDist);

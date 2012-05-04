@@ -20,7 +20,7 @@ public class Path implements Comparable<Path> {
 		this.path = new LinkedList<Cell>(path);
 		this.fCost = fCost;
 	}
-	
+
 	public Path(Cell start, double fCost) {
 		super();
 		this.path = new LinkedList<Cell>();
@@ -45,9 +45,9 @@ public class Path implements Comparable<Path> {
 
 	@Override
 	public int compareTo(Path p) {
-		if(this.fCost < p.fCost)
+		if (this.fCost < p.fCost)
 			return -1;
-		else if(this.fCost == p.fCost) {
+		else if (this.fCost == p.fCost) {
 			return 0;
 		} else {
 			return 1;

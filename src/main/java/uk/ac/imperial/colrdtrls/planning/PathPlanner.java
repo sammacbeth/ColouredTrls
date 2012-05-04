@@ -17,11 +17,15 @@ import uk.ac.imperial.presage2.util.location.Cell;
 
 public class PathPlanner {
 
-	private final Logger logger; 
+	private final Logger logger;
 	final private UUID player;
 	final private KnowledgeBaseService knowledge;
 	Set<HardConstraint> hardConstraints = new HashSet<HardConstraint>();
 	Set<SoftConstraint> softConstraints = new HashSet<SoftConstraint>();
+
+	ArrayList<Path> savedPaths;
+	Cell savedStart;
+	Cell savedGoal;
 
 	public PathPlanner(UUID player, KnowledgeBaseService knowledge,
 			Set<HardConstraint> hardConstraints,
@@ -31,7 +35,7 @@ public class PathPlanner {
 		this.knowledge = knowledge;
 		this.hardConstraints = hardConstraints;
 		this.softConstraints = softConstraints;
-		logger = Logger.getLogger("PathPlanner, "+ player);
+		logger = Logger.getLogger("PathPlanner, " + player);
 	}
 
 	public Move getNextMove() {
@@ -50,28 +54,42 @@ public class PathPlanner {
 		if (start.equals(goal)) {
 			// nothing to do
 		} else {
-			logger.debug("Starting search from "+ start +" to "+ goal);
+			logger.debug("Starting search from " + start + " to " + goal);
 			ArrayList<Path> paths = new ArrayList<Path>();
 			paths.add(new Path(start, 0));
 
-			for(int i=0; i < 100; i++) {
+			// use saved search space if available.
+			if (start.equals(savedStart) && goal.equals(savedGoal))
+				paths = savedPaths;
+
+			for (int i = 0; i < 100; i++) {
 				boolean updated = false;
+				LinkedList<Path> prune = new LinkedList<Path>();
 				for (Path path : paths) {
 					if (path.finishesAt(goal)) {
+						logger.info("Found goal in " + paths.size() + " paths");
 						return path;
-					} else if (!path.isExpanded()) {
+					} else if (path.isExpanded()) {
+						prune.add(path);
+					} else {
 						paths.addAll(expandNode(path, goal));
 						updated = true;
 						break;
 					}
 				}
+				paths.removeAll(prune);
 				if (!updated) {
 					return null;
 				}
 				Collections.sort(paths);
 			}
-			// max expansions exhausted.
-			logger.warn("Maximum expansions exhausted, "+ start +" -> "+ goal +", "+ paths.size() +" paths.");
+			// max expansions exhausted, choose best available path
+			logger.warn("Maximum expansions exhausted, " + start + " -> "
+					+ goal + ", " + paths.size() + " paths.");
+			savedStart = start;
+			savedGoal = goal;
+			savedPaths = paths;
+			return paths.get(0);
 		}
 		return null;
 	}

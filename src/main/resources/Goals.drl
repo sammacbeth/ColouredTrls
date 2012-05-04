@@ -15,7 +15,7 @@ rule "Create goal for agents when none exist"
         not Goal( player == $p )
         $tiles : List( size > 0 ) from collect( Tile( location != $p.getLocation() ) )
     then
-    	Goal g = Goal.randomGoal( $p, Random.randomInt(10), $tiles);
+		Goal g = Goal.randomGoal( $p, 1, $tiles);
     	colrdtrlsLogger.info("Creating goal "+ g);
         insert( g );
 end
