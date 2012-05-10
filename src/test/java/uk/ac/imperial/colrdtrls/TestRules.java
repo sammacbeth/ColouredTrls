@@ -2,6 +2,8 @@ package uk.ac.imperial.colrdtrls;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.UUID;
+
 import org.apache.log4j.Logger;
 import org.drools.runtime.StatefulKnowledgeSession;
 import org.drools.runtime.rule.FactHandle;
@@ -20,6 +22,14 @@ import uk.ac.imperial.colrdtrls.facts.Surrender;
 import uk.ac.imperial.colrdtrls.facts.Surrendered;
 import uk.ac.imperial.colrdtrls.facts.Tile;
 import uk.ac.imperial.colrdtrls.facts.Turn;
+import uk.ac.imperial.colrdtrls.protocols.TokenExchangeProtocol.Exchange;
+import uk.ac.imperial.presage2.core.IntegerTime;
+import uk.ac.imperial.presage2.core.Time;
+import uk.ac.imperial.presage2.core.messaging.Performative;
+import uk.ac.imperial.presage2.core.network.Message;
+import uk.ac.imperial.presage2.core.network.NetworkAddress;
+import uk.ac.imperial.presage2.core.network.UnicastMessage;
+import uk.ac.imperial.presage2.core.simulator.SimTime;
 import uk.ac.imperial.presage2.core.util.random.Random;
 import uk.ac.imperial.presage2.rules.RuleModule;
 import uk.ac.imperial.presage2.rules.RuleStorage;
@@ -39,8 +49,11 @@ public class TestRules {
 
 	@Before
 	public void setUp() throws Exception {
-		injector = Guice.createInjector(new RuleModule().addClasspathDrlFile(
-				"ColrdTrls.drl").addClasspathDrlFile("MoveHandler.drl"));
+		injector = Guice.createInjector(new RuleModule()
+				.addClasspathDrlFile("ColrdTrls.drl")
+				.addClasspathDrlFile("MoveHandler.drl")
+				.addClasspathDrlFile("Goals.drl")
+				.addClasspathDrlFile("TokenExchange.drl"));
 		rules = injector.getInstance(RuleStorage.class);
 		session = injector.getInstance(StatefulKnowledgeSession.class);
 		session.setGlobal("colrdtrlsLogger", logger);
@@ -254,6 +267,92 @@ public class TestRules {
 		assertEquals(0, s1.getCount());
 		assertEquals(1, o2.getCount());
 		assertEquals(1, s2.getCount());
+	}
+
+	@Test
+	public void testTokenExchange() {
+		Agent a1 = new Agent(Random.randomUUID());
+		Player p1 = new Player(a1, new Cell(0, 0));
+		NetworkAddress n1 = new NetworkAddress(a1.getAid());
+		assertEquals(a1.getAid(), n1.getId());
+		Agent a2 = new Agent(Random.randomUUID());
+		Player p2 = new Player(a2, new Cell(0, 1));
+		NetworkAddress n2 = new NetworkAddress(a2.getAid());
+		assertEquals(a2.getAid(), n2.getId());
+
+		Colour c1 = Colour.BLUE;
+		Colour c2 = Colour.GREEN;
+
+		Owns p1o1 = new Owns(p1, c1, 0);
+		Owns p1o2 = new Owns(p1, c2, 3);
+		Surrendered p1s1 = new Surrendered(p1, c1, 0);
+		Surrendered p1s2 = new Surrendered(p1, c2, 0);
+
+		Owns p2o1 = new Owns(p2, c1, 3);
+		Owns p2o2 = new Owns(p2, c2, 0);
+		Surrendered p2s1 = new Surrendered(p2, c1, 0);
+		Surrendered p2s2 = new Surrendered(p2, c2, 0);
+
+		session.insert(a1);
+		session.insert(p1);
+		session.insert(a2);
+		session.insert(p2);
+		session.insert(c1);
+		session.insert(c2);
+		session.insert(p1o1);
+		session.insert(p1o2);
+		session.insert(p1s1);
+		session.insert(p1s2);
+		session.insert(p2o1);
+		session.insert(p2o2);
+		session.insert(p2s1);
+		session.insert(p2s2);
+
+		rules.incrementTime();
+
+		Time t = new IntegerTime(0);
+		new SimTime(t);
+		UUID convKey = Random.randomUUID();
+		Exchange ex = new Exchange(c2, c1);
+		Message<Exchange> m1 = new UnicastMessage<Exchange>(
+				Performative.PROPOSE, "OFFER", SimTime.get(), n1, n2, ex);
+		m1.setConversationKey(convKey);
+		session.insert(m1);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(3, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+
+		Message<Exchange> m2 = new UnicastMessage<Exchange>(
+				Performative.ACCEPT_PROPOSAL, "ACCEPT", t, n2, n1, ex.reverse());
+		m2.setConversationKey(convKey);
+		session.insert(m2);
+		session.insert(new Surrender(p2, c1));
+
+		rules.incrementTime();
+		t.increment();
+
+		session.insert(new Surrender(p1, c2));
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(1, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(1, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+
 	}
 
 }

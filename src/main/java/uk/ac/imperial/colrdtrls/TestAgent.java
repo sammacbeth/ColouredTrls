@@ -1,6 +1,10 @@
 package uk.ac.imperial.colrdtrls;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,12 +18,17 @@ import uk.ac.imperial.colrdtrls.planning.NoInfringmentConstraint;
 import uk.ac.imperial.colrdtrls.planning.PathPlanner;
 import uk.ac.imperial.colrdtrls.planning.SoftConstraint;
 import uk.ac.imperial.colrdtrls.planning.StraightLineDistance;
+import uk.ac.imperial.colrdtrls.protocols.TokenExchangeProtocol;
+import uk.ac.imperial.colrdtrls.protocols.TokenExchangeProtocol.Exchange;
 import uk.ac.imperial.presage2.core.environment.ActionHandlingException;
 import uk.ac.imperial.presage2.core.environment.ParticipantSharedState;
 import uk.ac.imperial.presage2.core.environment.UnavailableServiceException;
 import uk.ac.imperial.presage2.core.event.EventBus;
 import uk.ac.imperial.presage2.core.messaging.Input;
+import uk.ac.imperial.presage2.core.network.NetworkAddress;
 import uk.ac.imperial.presage2.core.simulator.SimTime;
+import uk.ac.imperial.presage2.core.util.random.Random;
+import uk.ac.imperial.presage2.util.fsm.FSMException;
 import uk.ac.imperial.presage2.util.location.Cell;
 import uk.ac.imperial.presage2.util.location.ParticipantLocationService;
 import uk.ac.imperial.presage2.util.location.area.AreaService;
@@ -35,6 +44,7 @@ public class TestAgent extends AbstractParticipant {
 	int nextTurn;
 	PathPlanner planner;
 	EventBus eb;
+	TokenExchangeProtocol tokenExchange;
 
 	public TestAgent(UUID id, String name, Cell start) {
 		super(id, name);
@@ -80,12 +90,32 @@ public class TestAgent extends AbstractParticipant {
 
 		planner = new PathPlanner(getID(), knowledge, hardConstraints,
 				softConstraints);
+
+		try {
+			this.tokenExchange = new TokenExchangeProtocol(getID(), authkey,
+					environment, network) {
+
+				@Override
+				protected boolean acceptExchange(NetworkAddress from,
+						Exchange exchange) {
+					// accept if I have a token to exchange.
+					if (tileService.getPlayerTokens(getID()).get(
+							exchange.getMine()) > 0) {
+						return true;
+					}
+					return false;
+				}
+			};
+		} catch (FSMException e) {
+			logger.warn("Error creating token exchange protocol", e);
+		}
 	}
 
 	@Override
 	protected void processInput(Input in) {
-		// TODO Auto-generated method stub
-
+		if (this.tokenExchange != null && this.tokenExchange.canHandle(in)) {
+			this.tokenExchange.handle(in);
+		}
 	}
 
 	@Override
@@ -110,6 +140,23 @@ public class TestAgent extends AbstractParticipant {
 			}
 
 			nextTurn = this.knowledge.nextTurn();
+		}
+		if (this.tokenExchange != null) {
+			if (this.tokenExchange.getActiveConversations().size() == 0) {
+				for (NetworkAddress a : this.network.getConnectedNodes()) {
+					List<Colour> colours = new ArrayList<Colour>(
+							Arrays.asList(Colour.values()));
+					Colour c1 = colours.get(Random.randomInt(colours.size()));
+					colours.remove(c1);
+					Colour c2 = colours.get(Random.randomInt(colours.size()));
+					try {
+						this.tokenExchange.offer(a, c1, c2);
+					} catch (FSMException e) {
+						logger.warn("Error creating token offer", e);
+					}
+				}
+			}
+			this.tokenExchange.incrementTime();
 		}
 	}
 

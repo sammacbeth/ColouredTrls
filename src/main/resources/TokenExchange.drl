@@ -1,0 +1,212 @@
+package uk.ac.imperial.colrdtrls.facts
+
+#list any import classes here.
+import java.util.UUID
+import uk.ac.imperial.presage2.core.Action
+import uk.ac.imperial.presage2.core.Time
+import uk.ac.imperial.presage2.core.network.UnicastMessage
+import uk.ac.imperial.presage2.core.messaging.Performative
+import uk.ac.imperial.presage2.core.simulator.SimTime
+import uk.ac.imperial.presage2.rules.facts.Agent
+import uk.ac.imperial.colrdtrls.facts.Player
+import uk.ac.imperial.colrdtrls.facts.Colour
+import uk.ac.imperial.colrdtrls.facts.Surrender
+import uk.ac.imperial.colrdtrls.facts.Surrendered
+import uk.ac.imperial.colrdtrls.facts.Owns
+import uk.ac.imperial.colrdtrls.facts.Surrendered
+import uk.ac.imperial.colrdtrls.facts.Infringement
+import uk.ac.imperial.colrdtrls.protocols.TokenExchangeProtocol.Exchange
+
+global org.apache.log4j.Logger colrdtrlsLogger
+
+declare UnicastMessage
+	@role( event )
+end
+
+declare Offered
+	@role( event )
+	key : UUID @key
+	from : Player
+	to : Player
+	c1 : Colour
+	c2 : Colour
+	time : int
+end
+
+declare Accepted
+	@role( event )
+	key : UUID @key
+	from : Player
+	to : Player
+	c1 : Colour
+	c2 : Colour
+	time : int
+end
+
+declare Exchanged
+	@role( event )
+	key : UUID @key
+	from : Player
+	to : Player
+	c1 : Colour
+	c2 : Colour
+	time : int
+end
+
+declare HasExchanged
+	@role( event )
+	exchange: Exchanged @key
+	player 	: Player	@key
+end
+
+declare PowOffer
+	@role( event )
+	player: Player @key
+	colour: Colour @key
+end
+
+declare PowAccept
+	@role( event )
+	player: Player @key
+	offer: Offered @key
+end
+
+query getPlayer(UUID $id, Player $p)
+	$agent : Agent( aid == $id )
+	Player( $p := this, agent == $agent )
+end
+
+rule "Empowered to offer"
+	when
+		Owns ( $p := player, $c := colour, count > 0 )
+	then
+		insertLogical( new PowOffer( $p, $c ) );
+end
+
+rule "Empowered to accept"
+	when
+		$o : Offered( $p : to, $c : c2 )
+		Owns ( player == $p, colour == $c, count > 0 )
+	then
+		insertLogical( new PowAccept( $p, $o ) );
+end
+
+rule "Exchange offer"
+	when
+		// offer message
+		$offer : 	UnicastMessage( getPerformative() == Performative.PROPOSE, getType() == "OFFER", 
+						$from : getFrom(), $to : getTo(), $exchange : getData(), $conv : getConversationKey(),
+						$t : getTimestamp() )
+		$agentFrom 	: Agent( aid == $from.getId() )
+		$agentTo	: Agent( aid == $to.getId() )
+		$playerFrom	: Player( agent == $agentFrom )
+		$playerTo	: Player( agent == $agentTo )
+	then
+		retract( $offer )
+		insert( new Offered( $conv, $playerFrom, $playerTo, ((Exchange)$exchange).getMine(), ((Exchange)$exchange).getTheirs(), $t.intValue() ) );
+end
+
+rule "Offered"
+	when
+		$o : Offered( )
+	then
+		colrdtrlsLogger.info( $o );
+end
+
+rule "Accepted"
+	when
+		$a : Accepted( )
+	then
+		colrdtrlsLogger.info( $a );
+end
+
+rule "Accept exchange"
+	when
+		$accept : 	UnicastMessage( getPerformative() == Performative.ACCEPT_PROPOSAL, getType() == "ACCEPT",
+						 $to : getFrom(), $from : getTo(),  $exchange : getData(), $conv : getConversationKey(),
+						 $t : getTimestamp()  )
+		// to and from are reversed so they will match the offer
+		$agentFrom 	: Agent( aid == $from.getId() )
+		$agentTo	: Agent( aid == $to.getId() )
+		$playerFrom	: Player( agent == $agentFrom )
+		$playerTo	: Player( agent == $agentTo )
+	then
+		retract( $accept )
+		insert( new Accepted( $conv, $playerFrom, $playerTo, ((Exchange)$exchange).getTheirs(), ((Exchange)$exchange).getMine(), $t.intValue() ));
+end
+
+rule "Reject exchange"
+	when
+		$reject : 	UnicastMessage( getPerformative() == Performative.REJECT_PROPOSAL, getType() == "REJECT",
+						 $to : getFrom(), $from : getTo(), $conv : getConversationKey() )
+		// to and from are reversed so they will match the offer
+		$agentFrom 	: Agent( aid == $from.getId() )
+		$agentTo	: Agent( aid == $to.getId() )
+		$playerFrom	: Player( agent == $agentFrom )
+		$playerTo	: Player( agent == $agentTo )
+		
+		$offer : Offered( key == $conv )
+	then
+		retract( $reject )
+		retract( $offer )
+end
+
+rule "Detect Exchange"
+	when
+		// offer message
+		$offer 	: Offered( $conv : key, $from : from, $to : to, $c1 : c1, $c2 : c2, $t : time )
+		// accept after offer
+		$accept : Accepted( key == $conv, from == $from, to == $to, c1 == $c1, c2 == $c2,
+						$t2 : time, time >= $t)
+	then
+		insert( new Exchanged( $conv, $from, $to, $c1, $c2, $t2) );
+		colrdtrlsLogger.info( "Exchanged: "+ $conv );
+end
+
+rule "Take from initiator"
+	salience -10
+	when
+		// if we haven't taken from them and they have surrendered the token.
+		$e : Exchanged( $from : from, $c : c1, $to : to )
+		$p1Surrendered 	: Surrendered( player == $from, colour == $c, count > 0 )
+		$p2Owns 		: Owns( player == $to, colour == $c )
+		not HasExchanged( $e, $from ;)
+	then
+		colrdtrlsLogger.info("Taking "+ $c +" from "+ $from +", giving to "+ $to);
+		insert( new HasExchanged($e, $from) );
+		modify($p1Surrendered) {
+			decrement();
+		};
+		modify($p2Owns) {
+			increment();
+		};
+end
+
+rule "Take from receiver"
+	when
+		// if we haven't taken from them and they have surrendered the token. 
+		$e : Exchanged( $from : to, $c : c2, $to : from )
+		$p2Surrendered 	: Surrendered( player == $from, colour == $c, count > 0 )
+		$p1Owns 		: Owns( player == $to, colour == $c )
+		not HasExchanged( $e, $from ;)
+	then
+		colrdtrlsLogger.info("Taking "+ $c +" from "+ $from +", giving to "+ $to);
+		insert( new HasExchanged($e, $from) );
+		modify($p2Surrendered) {
+			decrement();
+		};
+		modify($p1Owns) {
+			increment();
+		};
+end
+
+rule "Offer infringement"
+	when
+		$o : Offered( $key: key, $from : from, $c1 : c1 )
+		not Exchanged( key == $key )
+		not PowOffer( $from, $c1 ;)
+	then
+		Infringement in = new Infringement( $from , $o );
+		colrdtrlsLogger.info( in );
+		insert( in );
+end
