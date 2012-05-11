@@ -25,6 +25,7 @@ end
 
 declare Offered
 	@role( event )
+	@expires( 6s )
 	key : UUID @key
 	from : Player
 	to : Player
@@ -35,6 +36,7 @@ end
 
 declare Accepted
 	@role( event )
+	@expires( 6s )
 	key : UUID @key
 	from : Player
 	to : Player
@@ -77,21 +79,30 @@ query getPlayer(UUID $id, Player $p)
 end
 
 rule "Empowered to offer"
+	salience 1
 	when
 		Owns ( $p := player, $c := colour, count > 0 )
+		or
+		Surrendered ( $p := player, $c := colour, count > 0 )
 	then
 		insertLogical( new PowOffer( $p, $c ) );
 end
 
 rule "Empowered to accept"
+	salience 1
 	when
 		$o : Offered( $p : to, $c : c2 )
-		Owns ( player == $p, colour == $c, count > 0 )
+		(
+			Owns ( player == $p, colour == $c, count > 0 )
+			or
+			Surrendered ( player == $p, colour == $c, count > 0 )
+		)
 	then
 		insertLogical( new PowAccept( $p, $o ) );
 end
 
 rule "Exchange offer"
+	salience 10
 	when
 		// offer message
 		$offer : 	UnicastMessage( getPerformative() == Performative.PROPOSE, getType() == "OFFER", 
@@ -121,6 +132,7 @@ rule "Accepted"
 end
 
 rule "Accept exchange"
+	salience 8
 	when
 		$accept : 	UnicastMessage( getPerformative() == Performative.ACCEPT_PROPOSAL, getType() == "ACCEPT",
 						 $to : getFrom(), $from : getTo(),  $exchange : getData(), $conv : getConversationKey(),
@@ -136,6 +148,7 @@ rule "Accept exchange"
 end
 
 rule "Reject exchange"
+	salience 9
 	when
 		$reject : 	UnicastMessage( getPerformative() == Performative.REJECT_PROPOSAL, getType() == "REJECT",
 						 $to : getFrom(), $from : getTo(), $conv : getConversationKey() )
@@ -152,12 +165,13 @@ rule "Reject exchange"
 end
 
 rule "Detect Exchange"
+	salience 5
 	when
 		// offer message
 		$offer 	: Offered( $conv : key, $from : from, $to : to, $c1 : c1, $c2 : c2, $t : time )
 		// accept after offer
 		$accept : Accepted( key == $conv, from == $from, to == $to, c1 == $c1, c2 == $c2,
-						$t2 : time, time >= $t)
+						$t2 : time, this after[0s, 5s] $offer)
 	then
 		insert( new Exchanged( $conv, $from, $to, $c1, $c2, $t2) );
 		colrdtrlsLogger.info( "Exchanged: "+ $conv );
@@ -183,6 +197,7 @@ rule "Take from initiator"
 end
 
 rule "Take from receiver"
+	salience 6
 	when
 		// if we haven't taken from them and they have surrendered the token. 
 		$e : Exchanged( $from : to, $c : c2, $to : from )
@@ -201,12 +216,39 @@ rule "Take from receiver"
 end
 
 rule "Offer infringement"
+	salience -1
 	when
 		$o : Offered( $key: key, $from : from, $c1 : c1 )
 		not Exchanged( key == $key )
 		not PowOffer( $from, $c1 ;)
+		not Infringement( action == $o )
 	then
 		Infringement in = new Infringement( $from , $o );
+		colrdtrlsLogger.info( in );
+		insert( in );
+end
+
+rule "Accept infringement"
+	salience 6
+	when
+		$o : Offered( $key: key, $to : to, $c2 : c2 )
+		$a : Accepted( key == $key, to == $to, c2 == $c2 )
+		not Exchanged( key == $key )
+		not PowAccept( $to, $c1 ;)
+		not Infringement( action == $a )
+	then
+		Infringement in = new Infringement( $to , $a );
+		colrdtrlsLogger.info( in );
+		insert( in );
+end
+
+rule "Not surrendering infringement"
+	salience -1
+	when
+		$e : Exchanged( $p : from )
+		not( HasExchanged( $e, $p ; this after[0s, 5s] $e ) )
+	then
+		Infringement in = new Infringement( $p , $e );
 		colrdtrlsLogger.info( in );
 		insert( in );
 end

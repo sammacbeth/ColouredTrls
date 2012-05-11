@@ -2,9 +2,13 @@ package uk.ac.imperial.colrdtrls;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
+import org.drools.runtime.ObjectFilter;
 import org.drools.runtime.StatefulKnowledgeSession;
 import org.drools.runtime.rule.FactHandle;
 import org.drools.runtime.rule.QueryResults;
@@ -15,6 +19,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import uk.ac.imperial.colrdtrls.facts.Colour;
+import uk.ac.imperial.colrdtrls.facts.Infringement;
 import uk.ac.imperial.colrdtrls.facts.Move;
 import uk.ac.imperial.colrdtrls.facts.Owns;
 import uk.ac.imperial.colrdtrls.facts.Player;
@@ -271,6 +276,8 @@ public class TestRules {
 
 	@Test
 	public void testTokenExchange() {
+		int infringeCount = 0;
+
 		Agent a1 = new Agent(Random.randomUUID());
 		Player p1 = new Player(a1, new Cell(0, 0));
 		NetworkAddress n1 = new NetworkAddress(a1.getAid());
@@ -312,12 +319,14 @@ public class TestRules {
 
 		Time t = new IntegerTime(0);
 		new SimTime(t);
+
+		// valid exchange
 		UUID convKey = Random.randomUUID();
 		Exchange ex = new Exchange(c2, c1);
-		Message<Exchange> m1 = new UnicastMessage<Exchange>(
+		Message<Exchange> request = new UnicastMessage<Exchange>(
 				Performative.PROPOSE, "OFFER", SimTime.get(), n1, n2, ex);
-		m1.setConversationKey(convKey);
-		session.insert(m1);
+		request.setConversationKey(convKey);
+		session.insert(request);
 
 		rules.incrementTime();
 		t.increment();
@@ -330,11 +339,12 @@ public class TestRules {
 		assertEquals(0, p2o2.getCount());
 		assertEquals(0, p2s1.getCount());
 		assertEquals(0, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
 
-		Message<Exchange> m2 = new UnicastMessage<Exchange>(
+		Message<Exchange> accept = new UnicastMessage<Exchange>(
 				Performative.ACCEPT_PROPOSAL, "ACCEPT", t, n2, n1, ex.reverse());
-		m2.setConversationKey(convKey);
-		session.insert(m2);
+		accept.setConversationKey(convKey);
+		session.insert(accept);
 		session.insert(new Surrender(p2, c1));
 
 		rules.incrementTime();
@@ -352,7 +362,308 @@ public class TestRules {
 		assertEquals(1, p2o2.getCount());
 		assertEquals(0, p2s1.getCount());
 		assertEquals(0, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
 
+		// rejected exchange
+		convKey = Random.randomUUID();
+		ex = new Exchange(c2, c1);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey);
+		session.insert(request);
+
+		rules.incrementTime();
+		t.increment();
+
+		Message<Exchange> reject = new UnicastMessage<Exchange>(
+				Performative.REJECT_PROPOSAL, "REJECT", t, n2, n1, ex.reverse());
+		reject.setConversationKey(convKey);
+		session.insert(reject);
+
+		session.insert(new Surrender(p2, c2));
+		session.insert(new Surrender(p1, c1));
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(1, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(1, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// can't accept after rejecting
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n2, n1, ex.reverse());
+		accept.setConversationKey(convKey);
+		session.insert(accept);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(1, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(1, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// ignore different conv keys
+		convKey = Random.randomUUID();
+		UUID convKey2 = Random.randomUUID();
+		ex = new Exchange(c2, c1);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey);
+		session.insert(request);
+
+		rules.incrementTime();
+		t.increment();
+
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n2, n1, ex.reverse());
+		accept.setConversationKey(convKey2);
+		session.insert(accept);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(1, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(1, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// ignore out of order messages
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey2);
+		session.insert(request);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(1, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(1, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// ignore if response > 5 steps after offer
+		convKey = Random.randomUUID();
+		ex = new Exchange(c1, c2);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey);
+		session.insert(request);
+
+		// 6 time steps
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n2, n1, ex.reverse());
+		accept.setConversationKey(convKey);
+		session.insert(accept);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(1, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(2, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(1, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// process if response <= 5 steps after offer
+		convKey = Random.randomUUID();
+		ex = new Exchange(c1, c2);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey);
+		session.insert(request);
+
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n2, n1, ex.reverse());
+		accept.setConversationKey(convKey);
+
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+
+		session.insert(accept);
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(3, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// infringement if offer without token.
+		convKey = Random.randomUUID();
+		ex = new Exchange(c1, c2);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n1, n2, ex);
+		request.setConversationKey(convKey);
+		session.insert(request);
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(3, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+		assertEquals(++infringeCount, getInfringements().size());
+
+		// infringment if accept without token
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n2, n1, ex.reverse());
+		accept.setConversationKey(convKey);
+		session.insert(accept);
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(3, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(0, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+		assertEquals(++infringeCount, getInfringements().size());
+
+		// 2nd infringement will be logged after no surrender takes place after
+		// 5 timesteps
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(++infringeCount, getInfringements().size());
+
+		// infringement: offerer not surrendering token
+		convKey = Random.randomUUID();
+		ex = new Exchange(c1, c2);
+		request = new UnicastMessage<Exchange>(Performative.PROPOSE, "OFFER",
+				SimTime.get(), n2, n1, ex);
+		request.setConversationKey(convKey);
+		accept = new UnicastMessage<Exchange>(Performative.ACCEPT_PROPOSAL,
+				"ACCEPT", t, n1, n2, ex.reverse());
+		accept.setConversationKey(convKey);
+		session.insert(request);
+
+		rules.incrementTime();
+		t.increment();
+
+		session.insert(accept);
+
+		rules.incrementTime();
+		t.increment();
+
+		session.insert(new Surrender(p1, c2));
+
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(1, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+		assertEquals(infringeCount, getInfringements().size());
+
+		// infringement not counted until 5 timesteps after
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+		rules.incrementTime();
+		t.increment();
+
+		assertEquals(0, p1o1.getCount());
+		assertEquals(2, p1o2.getCount());
+		assertEquals(0, p1s1.getCount());
+		assertEquals(0, p1s2.getCount());
+		assertEquals(3, p2o1.getCount());
+		assertEquals(1, p2o2.getCount());
+		assertEquals(0, p2s1.getCount());
+		assertEquals(0, p2s2.getCount());
+		assertEquals(++infringeCount, getInfringements().size());
+	}
+
+	private Set<Infringement> getInfringements() {
+		Set<Infringement> infringements = new HashSet<Infringement>();
+		Collection<Object> fromSession = session.getObjects(new ObjectFilter() {
+			@Override
+			public boolean accept(Object object) {
+				return object instanceof Infringement;
+			}
+		});
+		for (Object object : fromSession) {
+			if (object instanceof Infringement) {
+				infringements.add((Infringement) object);
+			}
+		}
+		return infringements;
 	}
 
 }
